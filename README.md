@@ -4,6 +4,12 @@
 
 A Jenkins CLI + MCP server — manage nodes, users, and jobs from the terminal or from AI agents.
 
+```bash
+jenkins-mcp status
+jenkins-mcp node add worker-01 --ip 192.0.2.10 --labels "linux worker"
+jenkins-mcp serve
+```
+
 ## Features
 - **Node Management**: Add, remove, and list worker nodes/agents.
 - **Account Management**: Create and configure Jenkins user accounts.
@@ -13,17 +19,27 @@ A Jenkins CLI + MCP server — manage nodes, users, and jobs from the terminal o
 
 ## Install
 
+`jenkins-mcp` runs on **macOS, Linux, and Windows** — it's a pure-Python package,
+so pip works the same everywhere:
+
 ```bash
+# macOS / Linux / Windows — pip
 pip install jenkins-mcp-cli
-```
 
-or with [uv](https://docs.astral.sh/uv/):
-
-```bash
+# macOS / Linux / Windows — uv
 uv tool install jenkins-mcp-cli
 ```
 
-(installs the `jenkins-mcp` command)
+Both install a `jenkins-mcp` command on your `PATH` (in PowerShell, cmd, or a
+Unix shell alike).
+
+From a clone, on any OS:
+
+```bash
+git clone https://github.com/ml-lubich/jenkins-mcp.git
+cd jenkins-mcp
+uv tool install .
+```
 
 ## Quickstart
 
