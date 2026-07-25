@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ijenk"
+name = "jenkins-mcp-cli"
 version = "0.1.0"
 description = "Jenkins CLI + MCP server — manage nodes, users, and jobs from the terminal or from AI agents"
 readme = "README.md"
@@ -24,8 +24,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ml-lubich/ijenk"
-Repository = "https://github.com/ml-lubich/ijenk"
+Homepage = "https://github.com/ml-lubich/jenkins-mcp"
+Repository = "https://github.com/ml-lubich/jenkins-mcp"
 
 [project.optional-dependencies]
 dev = [
@@ -34,8 +34,7 @@ dev = [
 ]
 
 [project.scripts]
-ijenk = "ijenk.cli:main"
-ijenk-mcp = "ijenk.mcp_server:main"
+jenkins-mcp = "jenkins_mcp.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

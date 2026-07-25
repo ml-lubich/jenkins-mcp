@@ -1,10 +1,10 @@
 import sys
 import argparse
 import json
-from ijenk.client import JenkinsClient
+from jenkins_mcp.client import JenkinsClient
 
 def main():
-    parser = argparse.ArgumentParser(prog="ijenk", description="Jenkins MCP Server & CLI")
+    parser = argparse.ArgumentParser(prog="jenkins-mcp", description="Jenkins MCP Server & CLI")
     parser.add_argument("--url", default=None, help="Jenkins server URL (default: http://localhost:8080, or $JENKINS_URL)")
     parser.add_argument("--user", default=None, help="Jenkins admin username (or $JENKINS_USER)")
     parser.add_argument("--password", default=None, help="Jenkins admin password (or $JENKINS_PASSWORD)")
@@ -82,7 +82,7 @@ def main():
             print(f"- {j['name']} ({j['url']}) [color: {j['color']}]")
 
     elif args.command == "serve":
-        from ijenk.mcp_server import run_server
+        from jenkins_mcp.mcp_server import run_server
         run_server(client)
 
 if __name__ == "__main__":

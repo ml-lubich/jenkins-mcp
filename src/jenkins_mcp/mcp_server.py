@@ -1,8 +1,8 @@
 from mcp.server.fastmcp import FastMCP
-from ijenk.client import JenkinsClient
+from jenkins_mcp.client import JenkinsClient
 
 def create_mcp_server(client: JenkinsClient = None) -> FastMCP:
-    mcp = FastMCP("ijenk")
+    mcp = FastMCP("jenkins-mcp")
 
     if client is None:
         client = JenkinsClient.from_env()
@@ -42,7 +42,3 @@ def create_mcp_server(client: JenkinsClient = None) -> FastMCP:
 def run_server(client: JenkinsClient = None):
     mcp = create_mcp_server(client)
     mcp.run()
-
-
-def main():
-    run_server()

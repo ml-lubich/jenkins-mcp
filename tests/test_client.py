@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 import json
 import os
 import urllib.error
-from ijenk.client import JenkinsClient, resolve_jenkins_config, _groovy_escape
+from jenkins_mcp.client import JenkinsClient, resolve_jenkins_config, _groovy_escape
 
 class TestJenkinsClient(unittest.TestCase):
     def setUp(self):
@@ -183,7 +183,7 @@ class TestConfigResolution(unittest.TestCase):
         import tempfile
         from pathlib import Path
         with tempfile.TemporaryDirectory() as home:
-            config_dir = Path(home) / ".config" / "ijenk"
+            config_dir = Path(home) / ".config" / "jenkins-mcp"
             config_dir.mkdir(parents=True)
             (config_dir / "config.json").write_text(json.dumps(["not", "a", "dict"]))
             env = {"HOME": home, "JENKINS_USER": "envuser", "JENKINS_PASSWORD": "envpass"}
@@ -200,7 +200,7 @@ class TestConfigResolution(unittest.TestCase):
         @contextlib.contextmanager
         def _ctx():
             with tempfile.TemporaryDirectory() as tmp:
-                config_dir = Path(tmp) / ".config" / "ijenk"
+                config_dir = Path(tmp) / ".config" / "jenkins-mcp"
                 config_dir.mkdir(parents=True)
                 (config_dir / "config.json").write_text(json.dumps(config_dict))
                 yield tmp

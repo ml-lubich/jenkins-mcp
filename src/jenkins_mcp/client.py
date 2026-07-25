@@ -11,7 +11,7 @@ DEFAULT_URL = "http://localhost:8080"
 
 
 def _config_file_path() -> Path:
-    return Path.home() / ".config" / "ijenk" / "config.json"
+    return Path.home() / ".config" / "jenkins-mcp" / "config.json"
 
 
 def _load_config_file() -> Dict[str, str]:
