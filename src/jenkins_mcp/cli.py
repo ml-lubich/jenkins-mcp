@@ -40,6 +40,20 @@ def main():
     # jobs
     p_jobs = subparsers.add_parser("jobs", help="List Jenkins jobs")
 
+    # git
+    p_git = subparsers.add_parser("git", help="Git tool management")
+    git_sub = p_git.add_subparsers(dest="git_cmd", required=True)
+    git_sub.add_parser("use-jgit", help="Set the default Jenkins git tool to JGit (pure-Java, no OS git binary needed)")
+
+    # job
+    p_job = subparsers.add_parser("job", help="Job management")
+    job_sub = p_job.add_subparsers(dest="job_cmd", required=True)
+    p_job_build = job_sub.add_parser("build", help="Trigger a job build")
+    p_job_build.add_argument("name", help="Job name")
+    p_job_build.add_argument("--wait", action="store_true", help="Wait for the build to finish")
+    p_job_build.add_argument("--timeout", type=int, default=300, help="Max seconds to wait (default: 300)")
+    p_job_build.add_argument("--tail", type=int, default=40, help="Console log lines to print on non-SUCCESS (default: 40)")
+
     # serve
     p_serve = subparsers.add_parser("serve", help="Run MCP stdio server")
 
@@ -80,6 +94,28 @@ def main():
         print(f"=== Jenkins Jobs ({len(jobs)}) ===")
         for j in jobs:
             print(f"- {j['name']} ({j['url']}) [color: {j['color']}]")
+
+    elif args.command == "git":
+        if args.git_cmd == "use-jgit":
+            res = client.set_default_git_tool_jgit()
+            print(res["output"].strip())
+            if res["ok"]:
+                print("default git tool is now JGit")
+            else:
+                sys.exit(1)
+
+    elif args.command == "job":
+        if args.job_cmd == "build":
+            if args.wait:
+                res = client.wait_job(args.name, timeout=args.timeout)
+                print(f"{args.name} #{res['number']}: {res['result']}")
+                if res["result"] != "SUCCESS":
+                    tail = client.get_build_log_tail(args.name, lines=args.tail)
+                    print(tail)
+                    sys.exit(1)
+            else:
+                client.build_job(args.name)
+                print(f"queued: {args.name}")
 
     elif args.command == "serve":
         from jenkins_mcp.mcp_server import run_server

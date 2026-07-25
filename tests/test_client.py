@@ -108,6 +108,86 @@ class TestJenkinsClient(unittest.TestCase):
         self.assertTrue(res["success"])
         self.assertEqual(res["username"], "testuser2")
 
+    @patch.object(JenkinsClient, "execute_groovy")
+    def test_set_default_git_tool_jgit_ok(self, mock_groovy):
+        mock_groovy.return_value = (
+            "GITTOOL_BEFORE=[Default]\n"
+            "GITTOOL_AFTER=[JGitTool:Default]\n"
+        )
+        res = self.client.set_default_git_tool_jgit()
+        self.assertTrue(res["ok"])
+        self.assertIn("JGitTool", res["output"])
+
+    @patch.object(JenkinsClient, "execute_groovy")
+    def test_set_default_git_tool_jgit_not_ok(self, mock_groovy):
+        mock_groovy.return_value = "some unexpected error\n"
+        res = self.client.set_default_git_tool_jgit()
+        self.assertFalse(res["ok"])
+
+    @patch.object(JenkinsClient, "execute_groovy")
+    def test_build_job_queued(self, mock_groovy):
+        mock_groovy.return_value = "QUEUED=true\n"
+        res = self.client.build_job("myjob")
+        self.assertEqual(res["job"], "myjob")
+        self.assertTrue(res["queued"])
+
+    @patch.object(JenkinsClient, "execute_groovy")
+    def test_build_job_not_queued(self, mock_groovy):
+        mock_groovy.return_value = "QUEUED=false\n"
+        res = self.client.build_job("myjob")
+        self.assertFalse(res["queued"])
+
+    @patch.object(JenkinsClient, "execute_groovy")
+    def test_get_job_result_parses_fields(self, mock_groovy):
+        mock_groovy.return_value = "NUM=6\nBUILDING=false\nRESULT=SUCCESS\n"
+        res = self.client.get_job_result("myjob")
+        self.assertEqual(res["number"], 6)
+        self.assertFalse(res["building"])
+        self.assertEqual(res["result"], "SUCCESS")
+
+    @patch.object(JenkinsClient, "execute_groovy")
+    def test_get_job_result_building(self, mock_groovy):
+        mock_groovy.return_value = "NUM=6\nBUILDING=true\nRESULT=null\n"
+        res = self.client.get_job_result("myjob")
+        self.assertEqual(res["number"], 6)
+        self.assertTrue(res["building"])
+        self.assertIsNone(res["result"])
+
+    @patch.object(JenkinsClient, "execute_groovy")
+    def test_get_job_result_nobuild(self, mock_groovy):
+        mock_groovy.return_value = "NOBUILD\n"
+        res = self.client.get_job_result("myjob")
+        self.assertIsNone(res["number"])
+        self.assertFalse(res["building"])
+        self.assertIsNone(res["result"])
+
+    @patch("time.sleep", return_value=None)
+    @patch.object(JenkinsClient, "build_job")
+    @patch.object(JenkinsClient, "get_job_result")
+    def test_wait_job_detects_new_build_then_success(self, mock_result, mock_build, mock_sleep):
+        mock_result.side_effect = [
+            {"job": "myjob", "number": 5, "building": False, "result": "SUCCESS"},
+            {"job": "myjob", "number": 6, "building": True, "result": None},
+            {"job": "myjob", "number": 6, "building": False, "result": "SUCCESS"},
+        ]
+        res = self.client.wait_job("myjob", timeout=300, poll=6)
+        self.assertEqual(res["job"], "myjob")
+        self.assertEqual(res["number"], 6)
+        self.assertEqual(res["result"], "SUCCESS")
+        self.assertFalse(res["timed_out"])
+        mock_build.assert_called_once_with("myjob")
+
+    @patch("urllib.request.urlopen")
+    def test_get_build_log_tail(self, mock_urlopen):
+        mock_resp = MagicMock()
+        text = "\n".join(f"line{i}" for i in range(1, 51))
+        mock_resp.read.return_value = text.encode('utf-8')
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        tail = self.client.get_build_log_tail("myjob", lines=5)
+        self.assertEqual(tail, "\n".join(f"line{i}" for i in range(46, 51)))
+
     @patch("urllib.request.urlopen")
     def test_list_jobs(self, mock_urlopen):
         mock_resp = MagicMock()

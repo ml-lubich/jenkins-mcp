@@ -55,6 +55,59 @@ class TestCLI(unittest.TestCase):
                 self.assertIn("Create User 'newuser'", output)
                 mock_create.assert_called_once()
 
+    @patch("jenkins_mcp.client.JenkinsClient.set_default_git_tool_jgit")
+    def test_cli_git_use_jgit_success(self, mock_jgit):
+        mock_jgit.return_value = {"ok": True, "output": "GITTOOL_AFTER=[JGitTool:Default]\n"}
+        with patch.object(sys, "argv", ["jenkins-mcp", *CREDS, "git", "use-jgit"]):
+            with patch("sys.stdout", new=StringIO()) as fake_out:
+                main()
+                output = fake_out.getvalue()
+                self.assertIn("default git tool is now JGit", output)
+
+    @patch("jenkins_mcp.client.JenkinsClient.set_default_git_tool_jgit")
+    def test_cli_git_use_jgit_failure_exits_1(self, mock_jgit):
+        mock_jgit.return_value = {"ok": False, "output": "unexpected\n"}
+        with patch.object(sys, "argv", ["jenkins-mcp", *CREDS, "git", "use-jgit"]):
+            with patch("sys.stdout", new=StringIO()):
+                with self.assertRaises(SystemExit) as cm:
+                    main()
+                self.assertEqual(cm.exception.code, 1)
+
+    @patch("jenkins_mcp.client.JenkinsClient.build_job")
+    def test_cli_job_build_no_wait(self, mock_build):
+        mock_build.return_value = {"job": "myjob", "queued": True, "output": "QUEUED=true\n"}
+        with patch.object(sys, "argv", ["jenkins-mcp", *CREDS, "job", "build", "myjob"]):
+            with patch("sys.stdout", new=StringIO()) as fake_out:
+                main()
+                output = fake_out.getvalue()
+                self.assertIn("queued: myjob", output)
+                mock_build.assert_called_once()
+
+    @patch("jenkins_mcp.client.JenkinsClient.get_build_log_tail")
+    @patch("jenkins_mcp.client.JenkinsClient.wait_job")
+    def test_cli_job_build_wait_success_exit_0(self, mock_wait, mock_tail):
+        mock_wait.return_value = {"job": "myjob", "number": 6, "result": "SUCCESS", "waited": 6, "timed_out": False}
+        with patch.object(sys, "argv", ["jenkins-mcp", *CREDS, "job", "build", "myjob", "--wait"]):
+            with patch("sys.stdout", new=StringIO()) as fake_out:
+                main()
+                output = fake_out.getvalue()
+                self.assertIn("myjob #6: SUCCESS", output)
+                mock_tail.assert_not_called()
+
+    @patch("jenkins_mcp.client.JenkinsClient.get_build_log_tail")
+    @patch("jenkins_mcp.client.JenkinsClient.wait_job")
+    def test_cli_job_build_wait_failure_exit_1_prints_tail(self, mock_wait, mock_tail):
+        mock_wait.return_value = {"job": "myjob", "number": 6, "result": "FAILURE", "waited": 6, "timed_out": False}
+        mock_tail.return_value = "console log tail here"
+        with patch.object(sys, "argv", ["jenkins-mcp", *CREDS, "job", "build", "myjob", "--wait"]):
+            with patch("sys.stdout", new=StringIO()) as fake_out:
+                with self.assertRaises(SystemExit) as cm:
+                    main()
+                output = fake_out.getvalue()
+                self.assertEqual(cm.exception.code, 1)
+                self.assertIn("myjob #6: FAILURE", output)
+                self.assertIn("console log tail here", output)
+
     def test_cli_missing_credentials_exits_cleanly(self):
         with tempfile.TemporaryDirectory() as tmp_home:
             with patch.dict(os.environ, {"HOME": tmp_home}, clear=True):

@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -186,6 +187,79 @@ println 'USER_CREATED'
 """
         output = self.execute_groovy(script)
         return {"success": "USER_CREATED" in output, "username": username, "output": output}
+
+    def set_default_git_tool_jgit(self) -> Dict[str, Any]:
+        script = """
+import org.jenkinsci.plugins.gitclient.JGitTool
+import hudson.plugins.git.GitTool
+def d = Jenkins.instance.getDescriptorByType(GitTool.DescriptorImpl)
+def before = d.installations.collect{ it.name }
+d.setInstallations(new JGitTool())
+d.save()
+println "GITTOOL_BEFORE=" + before
+println "GITTOOL_AFTER=" + Jenkins.instance.getDescriptorByType(GitTool.DescriptorImpl).installations.collect{ it.class.simpleName + ':' + it.name }
+"""
+        output = self.execute_groovy(script)
+        ok = "GITTOOL_AFTER" in output and "JGitTool" in output
+        return {"ok": ok, "output": output}
+
+    def build_job(self, job_name: str) -> Dict[str, Any]:
+        job_name_esc = _groovy_escape(job_name)
+        script = f"""
+def j=Jenkins.instance.getItemByFullName('{job_name_esc}'); def q=j.scheduleBuild2(0); println "QUEUED=" + (q!=null)
+"""
+        output = self.execute_groovy(script)
+        return {"job": job_name, "queued": "QUEUED=true" in output, "output": output}
+
+    def get_job_result(self, job_name: str) -> Dict[str, Any]:
+        job_name_esc = _groovy_escape(job_name)
+        script = f"""
+def j=Jenkins.instance.getItemByFullName('{job_name_esc}'); def b=j?.lastBuild; if(b==null){{println "NOBUILD"}} else {{println "NUM="+b.number; println "BUILDING="+b.isBuilding(); println "RESULT="+(b.result?:"null")}}
+"""
+        output = self.execute_groovy(script)
+        result: Dict[str, Any] = {"job": job_name, "number": None, "building": False, "result": None}
+        for line in output.splitlines():
+            line = line.strip()
+            if line.startswith("NUM="):
+                result["number"] = int(line[len("NUM="):])
+            elif line.startswith("BUILDING="):
+                result["building"] = line[len("BUILDING="):].strip().lower() == "true"
+            elif line.startswith("RESULT="):
+                value = line[len("RESULT="):].strip()
+                result["result"] = None if value == "null" else value
+        return result
+
+    def wait_job(self, job_name: str, timeout: int = 300, poll: int = 6) -> Dict[str, Any]:
+        start = self.get_job_result(job_name)
+        start_number = start.get("number")
+        self.build_job(job_name)
+
+        result = start
+        elapsed = 0
+        timed_out = True
+        while elapsed <= timeout:
+            result = self.get_job_result(job_name)
+            if result.get("number") is not None and result.get("number") != start_number and not result.get("building"):
+                timed_out = False
+                break
+            time.sleep(poll)
+            elapsed += poll
+
+        return {
+            "job": job_name,
+            "number": result.get("number"),
+            "result": result.get("result"),
+            "waited": elapsed,
+            "timed_out": timed_out,
+        }
+
+    def get_build_log_tail(self, job_name: str, lines: int = 40) -> str:
+        quoted = urllib.parse.quote(job_name)
+        req = urllib.request.Request(f"{self.url}/job/{quoted}/lastBuild/consoleText")
+        req.add_header("Authorization", self._get_auth_header())
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            text = resp.read().decode('utf-8')
+        return "\n".join(text.splitlines()[-lines:])
 
     def list_jobs(self) -> List[Dict[str, Any]]:
         req = urllib.request.Request(f"{self.url}/api/json")

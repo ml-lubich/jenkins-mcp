@@ -1,3 +1,4 @@
+import json
 from mcp.server.fastmcp import FastMCP
 from jenkins_mcp.client import JenkinsClient
 
@@ -36,6 +37,18 @@ def create_mcp_server(client: JenkinsClient = None) -> FastMCP:
         """List all jobs in Jenkins."""
         jobs = client.list_jobs()
         return str(jobs)
+
+    @mcp.tool()
+    def jenkins_use_jgit() -> str:
+        """Set the default Jenkins git tool to JGit (pure-Java git, no OS git binary needed)."""
+        res = client.set_default_git_tool_jgit()
+        return json.dumps(res)
+
+    @mcp.tool()
+    def jenkins_build_job(job: str, wait: bool = True) -> str:
+        """Trigger a Jenkins job build, optionally waiting for the result."""
+        res = client.wait_job(job) if wait else client.build_job(job)
+        return json.dumps(res)
 
     return mcp
 
