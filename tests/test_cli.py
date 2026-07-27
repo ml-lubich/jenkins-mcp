@@ -128,6 +128,16 @@ class TestCLI(unittest.TestCase):
                 payload = json.loads(fake_out.getvalue())
         self.assertEqual(payload["schemaVersion"], "1")
 
+    @patch("jenkins_mcp.client.JenkinsClient.get_status")
+    def test_cli_output_flag_after_subcommand(self, mock_status):
+        # -o json must also work AFTER the subcommand, not only globally.
+        mock_status.return_value = {"nodes": []}
+        with patch.object(sys, "argv", ["jenkins-mcp", *CREDS, "status", "-o", "json"]):
+            with patch("sys.stdout", new=StringIO()) as fake_out:
+                main()
+                payload = json.loads(fake_out.getvalue())
+        self.assertEqual(payload["schemaVersion"], "1")
+
     @patch("jenkins_mcp.client.JenkinsClient.list_jobs")
     def test_cli_jobs_search_fuzzy_filter(self, mock_list_jobs):
         mock_list_jobs.return_value = [

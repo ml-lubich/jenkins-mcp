@@ -211,6 +211,20 @@ def main():
     # serve
     p_serve = subparsers.add_parser("serve", help="Run MCP stdio server")
 
+    # Accept -o/--output after the subcommand too (not just globally). SUPPRESS
+    # default so an unspecified sub-level flag never clobbers the global value.
+    def _add_output_everywhere(p):
+        for action in p._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                for sub in action.choices.values():
+                    try:
+                        sub.add_argument("-o", "--output", choices=["text", "json"],
+                                         default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+                    except argparse.ArgumentError:
+                        pass
+                    _add_output_everywhere(sub)
+    _add_output_everywhere(parser)
+
     args = parser.parse_args()
 
     if args.command == "context":
