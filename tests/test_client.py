@@ -112,7 +112,9 @@ class TestJenkinsClient(unittest.TestCase):
     def test_set_default_git_tool_jgit_ok(self, mock_groovy):
         mock_groovy.return_value = (
             "GITTOOL_BEFORE=[Default]\n"
-            "GITTOOL_AFTER=[JGitTool:Default]\n"
+            "GITTOOL_ARRAYTYPE=[Lhudson.plugins.git.GitTool;\n"
+            "GITTOOL_DEFAULT=JGitTool:jgit\n"
+            "GITTOOL_AFTER=[JGitTool:jgit]\n"
         )
         res = self.client.set_default_git_tool_jgit()
         self.assertTrue(res["ok"])

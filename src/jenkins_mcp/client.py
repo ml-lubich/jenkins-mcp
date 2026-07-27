@@ -194,13 +194,20 @@ import org.jenkinsci.plugins.gitclient.JGitTool
 import hudson.plugins.git.GitTool
 def d = Jenkins.instance.getDescriptorByType(GitTool.DescriptorImpl)
 def before = d.installations.collect{ it.name }
-d.setInstallations(new JGitTool())
+// Must be an explicitly-typed GitTool[]: a bare vararg erases to
+// ToolInstallation[], which makes GitTool.getDefaultInstallation() throw
+// ClassCastException when the git plugin casts the array back to GitTool[].
+GitTool[] tools = [ new JGitTool() ]
+d.setInstallations(tools)
 d.save()
+def resolved = GitTool.getDefaultInstallation()
 println "GITTOOL_BEFORE=" + before
+println "GITTOOL_ARRAYTYPE=" + d.installations.getClass().getName()
+println "GITTOOL_DEFAULT=" + (resolved ? resolved.class.simpleName + ':' + resolved.name : 'null')
 println "GITTOOL_AFTER=" + Jenkins.instance.getDescriptorByType(GitTool.DescriptorImpl).installations.collect{ it.class.simpleName + ':' + it.name }
 """
         output = self.execute_groovy(script)
-        ok = "GITTOOL_AFTER" in output and "JGitTool" in output
+        ok = "JGitTool" in output and "GITTOOL_DEFAULT=JGitTool" in output
         return {"ok": ok, "output": output}
 
     def build_job(self, job_name: str) -> Dict[str, Any]:
