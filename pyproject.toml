@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jenkins-mcp-cli"
-version = "0.3.0"
+version = "0.3.1"
 description = "Jenkins CLI + MCP server — build lifecycle, pipelines, logs, artifacts, queue, credentials, plugins, multi-context, node/user admin, and a native MCP server for AI agents"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,7 +20,11 @@ classifiers = [
     "Topic :: Software Development :: Build Tools",
 ]
 dependencies = [
-    "mcp>=1.0.0"
+    # Upper bound is load-bearing: mcp 2.x renamed FastMCP to MCPServer and
+    # moved mcp.server.fastmcp, so an unpinned install silently breaks the
+    # server — it surfaces only as a collection error / "Connection closed".
+    # Lift this together with a migration to MCPServer, not before.
+    "mcp>=1.0.0,<2"
 ]
 
 [project.urls]

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+Pin `mcp<2` — mcp 2.x renamed `FastMCP` to `MCPServer` and removed
+`mcp.server.fastmcp`, so an unbounded `mcp>=1.0.0` resolved 2.x on fresh
+installs and broke server startup / test collection.
+
 ## 0.3.0
 
 Major feature overhaul: build lifecycle with exit codes, pipeline/stage
