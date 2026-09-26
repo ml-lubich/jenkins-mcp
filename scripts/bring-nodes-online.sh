@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bring svl-dc-dev-test-01 / -02 online as inbound (JNLP) Jenkins agents.
+# Bring agent-01 / -02 online as inbound (JNLP) Jenkins agents.
 #
 # Run:  bash ~/dev/jenkins-mcp/scripts/bring-nodes-online.sh
 #
@@ -17,7 +17,7 @@ JUSER=$(jq -r '.username' "$CFG")
 JPASS=$(jq -r '.password' "$CFG")
 BOX_USER=$(jq -r '.ssh_boxes.username // "polaris"' "$CFG")
 BOX_PASS=$(jq -r '.ssh_boxes.password' "$CFG")
-NODES=( "svl-dc-dev-test-01:10.55.110.151" "svl-dc-dev-test-02:10.55.110.152" )
+NODES=( "agent-01:192.0.2.11" "agent-02:192.0.2.12" )
 
 echo ">> Jenkins: $JURL   (as $JUSER)"
 curl -fsS -u "$JUSER:$JPASS" "$JURL/api/json" >/dev/null \
