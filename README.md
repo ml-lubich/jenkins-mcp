@@ -75,10 +75,10 @@ so pip works the same everywhere:
 
 ```bash
 # macOS / Linux / Windows — pip
-pip install jenkins-mcp-cli
+pip install jenkins-cli-mcp
 
 # macOS / Linux / Windows — uv
-uv tool install jenkins-mcp-cli
+uv tool install jenkins-cli-mcp
 ```
 
 Both install a `jenkins-mcp` command on your `PATH` (in PowerShell, cmd, or a

@@ -64,7 +64,7 @@ def _exit_code_for_result(result: str | None) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(prog="jenkins-mcp", description="Jenkins MCP Server & CLI")
     try:
-        cli_version = version("jenkins-mcp-cli")
+        cli_version = version("jenkins-cli-mcp")
     except PackageNotFoundError:
         cli_version = "unknown"
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {cli_version}")
