@@ -354,6 +354,10 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
+The pytest configuration measures `jenkins_mcp` and fails the suite below 80%
+aggregate line coverage. Tests should use fake Jenkins responses and isolated
+configuration; they must not contact a live Jenkins server or use real credentials.
+
 ## License
 
 MIT
