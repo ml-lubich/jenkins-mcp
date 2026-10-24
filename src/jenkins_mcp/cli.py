@@ -3,6 +3,9 @@ import argparse
 import json
 import time
 import fnmatch
+from collections.abc import Callable
+from importlib.metadata import PackageNotFoundError, version
+from typing import Any
 from jenkins_mcp.client import (
     JenkinsClient,
     EXIT_CODE_BY_RESULT,
@@ -15,7 +18,11 @@ from jenkins_mcp.client import (
 )
 
 
-def emit(result, fmt, text_fn=None):
+def emit(
+    result: dict[str, Any],
+    fmt: str,
+    text_fn: Callable[[dict[str, Any]], None] | None = None,
+) -> None:
     """Print `result` either as a JSON envelope (schemaVersion first) or as text.
 
     In text mode, `text_fn(result)` is called to do the printing; if omitted,
@@ -30,8 +37,8 @@ def emit(result, fmt, text_fn=None):
         print(result)
 
 
-def _parse_params(pairs):
-    params = {}
+def _parse_params(pairs: list[str]) -> dict[str, str]:
+    params: dict[str, str] = {}
     for p in pairs:
         if "=" not in p:
             raise ValueError(f"Invalid --param '{p}', expected KEY=VALUE")
@@ -40,7 +47,7 @@ def _parse_params(pairs):
     return params
 
 
-def _fuzzy_match(term, name):
+def _fuzzy_match(term: str, name: str) -> bool:
     term_l, name_l = term.lower(), name.lower()
     if term_l in name_l:
         return True
@@ -48,21 +55,36 @@ def _fuzzy_match(term, name):
     return all(c in it for c in term_l)
 
 
-def _exit_code_for_result(result):
+def _exit_code_for_result(result: str | None) -> int:
     if result is None:
         return EXIT_ERROR
     return EXIT_CODE_BY_RESULT.get(result, EXIT_ERROR)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(prog="jenkins-mcp", description="Jenkins MCP Server & CLI")
-    parser.add_argument("--url", default=None, help="Jenkins server URL (default: http://localhost:8080, or $JENKINS_URL)")
-    parser.add_argument("--user", default=None, help="Jenkins admin username (or $JENKINS_USER)")
-    parser.add_argument("--password", default=None, help="Jenkins admin password (or $JENKINS_PASSWORD)")
-    parser.add_argument("--context", default=None, help="Named Jenkins context/profile from config (or $JENKINS_CONTEXT)")
-    parser.add_argument("-o", "--output", choices=["text", "json"], default="text", help="Output format (default: text)")
+    try:
+        cli_version = version("jenkins-mcp-cli")
+    except PackageNotFoundError:
+        cli_version = "unknown"
+    parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {cli_version}")
+    parser.add_argument("-j", "--json", dest="output", action="store_const", const="json", default="text",
+                        help="Use JSON output where supported")
+    parser.add_argument("-q", "--quiet", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("-v", "--verbose", action="count", default=0, help=argparse.SUPPRESS)
 
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    # Retain connection flags as hidden compatibility aliases. Prefer named
+    # contexts or JENKINS_* environment variables; passwords on argv can be
+    # visible to process inspection and shell history.
+    parser.add_argument("--url", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--user", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--password", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--password-stdin", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--context", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("-o", "--output", choices=["text", "json"], default=argparse.SUPPRESS,
+                        help=argparse.SUPPRESS)
+
+    subparsers = parser.add_subparsers(dest="command")
 
     # status
     p_status = subparsers.add_parser("status", help="Get status of all nodes")
@@ -70,7 +92,7 @@ def main():
 
     # node
     p_node = subparsers.add_parser("node", help="Node management")
-    node_sub = p_node.add_subparsers(dest="node_cmd", required=True)
+    node_sub = p_node.add_subparsers(dest="node_cmd")
 
     p_node_add = node_sub.add_parser("add", help="Add worker node")
     p_node_add.add_argument("name", help="Node name")
@@ -83,7 +105,7 @@ def main():
 
     # user
     p_user = subparsers.add_parser("user", help="User management")
-    user_sub = p_user.add_subparsers(dest="user_cmd", required=True)
+    user_sub = p_user.add_subparsers(dest="user_cmd")
 
     p_user_add = user_sub.add_parser("create", help="Create new user")
     p_user_add.add_argument("username", help="Username")
@@ -96,12 +118,12 @@ def main():
 
     # git
     p_git = subparsers.add_parser("git", help="Git tool management")
-    git_sub = p_git.add_subparsers(dest="git_cmd", required=True)
+    git_sub = p_git.add_subparsers(dest="git_cmd")
     git_sub.add_parser("use-jgit", help="Set the default Jenkins git tool to JGit (pure-Java, no OS git binary needed)")
 
     # job
     p_job = subparsers.add_parser("job", help="Job management")
-    job_sub = p_job.add_subparsers(dest="job_cmd", required=True)
+    job_sub = p_job.add_subparsers(dest="job_cmd")
 
     p_job_build = job_sub.add_parser("build", help="Trigger a job build")
     p_job_build.add_argument("name", help="Job name")
@@ -127,7 +149,7 @@ def main():
 
     # build (build-centric ops: cancel, input, artifacts, download)
     p_build = subparsers.add_parser("build", help="Build operations: cancel, input, artifacts, download")
-    build_sub = p_build.add_subparsers(dest="build_cmd", required=True)
+    build_sub = p_build.add_subparsers(dest="build_cmd")
 
     p_build_cancel = build_sub.add_parser("cancel", help="Cancel/abort a running build")
     p_build_cancel.add_argument("name", help="Job name")
@@ -153,28 +175,30 @@ def main():
 
     # pipeline
     p_pipeline = subparsers.add_parser("pipeline", help="Pipeline/stage inspection")
-    pipeline_sub = p_pipeline.add_subparsers(dest="pipeline_cmd", required=True)
+    pipeline_sub = p_pipeline.add_subparsers(dest="pipeline_cmd")
     p_pipeline_info = pipeline_sub.add_parser("info", help="Show the stage tree for a pipeline build")
     p_pipeline_info.add_argument("name", help="Job name")
     p_pipeline_info.add_argument("--build", default="lastBuild", help="Build number or 'lastBuild' (default)")
 
     # queue
     p_queue = subparsers.add_parser("queue", help="Build queue management")
-    queue_sub = p_queue.add_subparsers(dest="queue_cmd", required=True)
+    queue_sub = p_queue.add_subparsers(dest="queue_cmd")
     queue_sub.add_parser("list", help="List queued items")
     p_queue_cancel = queue_sub.add_parser("cancel", help="Cancel a queued item")
     p_queue_cancel.add_argument("item_id", type=int, help="Queue item id")
 
     # credential
     p_credential = subparsers.add_parser("credential", help="Credentials management")
-    credential_sub = p_credential.add_subparsers(dest="credential_cmd", required=True)
+    credential_sub = p_credential.add_subparsers(dest="credential_cmd")
     credential_sub.add_parser("list", help="List global credentials (never shows secrets)")
 
     p_cred_create = credential_sub.add_parser("create", help="Create a global credential")
     p_cred_create.add_argument("id", help="Credential id")
     p_cred_create.add_argument("--kind", choices=["userpass", "secret-text"], required=True, help="Credential kind")
     p_cred_create.add_argument("--username", default=None, help="Username (kind=userpass)")
-    p_cred_create.add_argument("--secret", default=None, help="Password/secret text")
+    p_cred_create.add_argument("--secret", default=None, help=argparse.SUPPRESS)
+    p_cred_create.add_argument("--secret-stdin", action="store_true",
+                               help="Read the secret value from standard input")
     p_cred_create.add_argument("--description", default="", help="Description")
 
     p_cred_delete = credential_sub.add_parser("delete", help="Delete a global credential")
@@ -182,7 +206,7 @@ def main():
 
     # plugin
     p_plugin = subparsers.add_parser("plugin", help="Plugin management")
-    plugin_sub = p_plugin.add_subparsers(dest="plugin_cmd", required=True)
+    plugin_sub = p_plugin.add_subparsers(dest="plugin_cmd")
     p_plugin_list = plugin_sub.add_parser("list", help="List installed plugins")
     p_plugin_list.add_argument("--search", default=None, help="Filter by substring in shortName")
     p_plugin_list.add_argument("--updates", action="store_true", help="Only show plugins with an available update")
@@ -191,7 +215,7 @@ def main():
 
     # context
     p_context = subparsers.add_parser("context", help="Manage named Jenkins contexts/profiles")
-    context_sub = p_context.add_subparsers(dest="context_cmd", required=True)
+    context_sub = p_context.add_subparsers(dest="context_cmd")
     context_sub.add_parser("list", help="List configured contexts (never shows passwords)")
     context_sub.add_parser("current", help="Show the active context (never shows passwords)")
 
@@ -226,6 +250,25 @@ def main():
     _add_output_everywhere(parser)
 
     args = parser.parse_args()
+
+    if args.command is None:
+        parser.print_help()
+        return
+
+    group_commands = {
+        "node": "node_cmd", "user": "user_cmd", "git": "git_cmd",
+        "job": "job_cmd", "build": "build_cmd", "pipeline": "pipeline_cmd",
+        "queue": "queue_cmd", "credential": "credential_cmd",
+        "plugin": "plugin_cmd", "context": "context_cmd",
+    }
+    nested = group_commands.get(args.command)
+    if nested and getattr(args, nested, None) is None:
+        next(action.choices[args.command] for action in parser._actions
+             if isinstance(action, argparse._SubParsersAction)).print_help()
+        return
+
+    if args.password_stdin:
+        args.password = sys.stdin.readline().rstrip("\r\n")
 
     if args.command == "context":
         _handle_context(args)
@@ -315,7 +358,7 @@ def main():
         run_server(client)
 
 
-def _handle_job(args, client):
+def _handle_job(args: argparse.Namespace, client: JenkinsClient) -> None:
     if args.job_cmd == "build":
         try:
             params = _parse_params(args.param)
@@ -369,7 +412,7 @@ def _handle_job(args, client):
             emit(res, args.output, lambda r: print(f"rerun queued: {args.name} (params from {r['rerun_of']})"))
 
 
-def _print_watch_result(args, client, res):
+def _print_watch_result(args: argparse.Namespace, client: JenkinsClient, res: dict[str, Any]) -> None:
     def _text(r):
         suffix = " (pending input)" if r.get("pending_input") else ""
         print(f"{args.name} #{r['number']}: {r['result']}{suffix}")
@@ -385,7 +428,7 @@ def _print_watch_result(args, client, res):
     sys.exit(code)
 
 
-def _handle_build(args, client):
+def _handle_build(args: argparse.Namespace, client: JenkinsClient) -> None:
     if args.build_cmd == "cancel":
         res = client.cancel_build(args.name, build=args.build, wait=args.wait)
         emit(res, args.output, lambda r: print(f"{args.name} {args.build}: stopped={r['stopped']}" + (f" result={r.get('result')}" if args.wait else "")))
@@ -437,7 +480,7 @@ def _handle_build(args, client):
         emit({"downloaded": downloaded}, args.output, _text)
 
 
-def _handle_pipeline(args, client):
+def _handle_pipeline(args: argparse.Namespace, client: JenkinsClient) -> None:
     if args.pipeline_cmd == "info":
         try:
             info = client.get_pipeline_info(args.name, build=args.build)
@@ -457,7 +500,7 @@ def _handle_pipeline(args, client):
         emit(info, args.output, _text)
 
 
-def _handle_queue(args, client):
+def _handle_queue(args: argparse.Namespace, client: JenkinsClient) -> None:
     if args.queue_cmd == "list":
         items = client.queue_list()
 
@@ -474,7 +517,7 @@ def _handle_queue(args, client):
         emit(res, args.output, lambda r: print(f"cancelled queue item #{r['id']}"))
 
 
-def _handle_credential(args, client):
+def _handle_credential(args: argparse.Namespace, client: JenkinsClient) -> None:
     if args.credential_cmd == "list":
         creds = client.list_credentials()
 
@@ -487,8 +530,9 @@ def _handle_credential(args, client):
 
     elif args.credential_cmd == "create":
         kind = "userpass" if args.kind == "userpass" else "secret_text"
+        secret = sys.stdin.readline().rstrip("\r\n") if args.secret_stdin else args.secret
         res = client.create_credential(
-            args.id, kind, username=args.username, secret=args.secret, description=args.description
+            args.id, kind, username=args.username, secret=secret, description=args.description
         )
         emit(res, args.output, lambda r: print(f"credential '{r['id']}': created={r['created']}"))
 
@@ -497,7 +541,7 @@ def _handle_credential(args, client):
         emit(res, args.output, lambda r: print(f"credential '{r['id']}': deleted={r['deleted']}"))
 
 
-def _handle_plugin(args, client):
+def _handle_plugin(args: argparse.Namespace, client: JenkinsClient) -> None:
     if args.plugin_cmd == "list":
         plugins = client.list_plugins(search=args.search or "")
         if args.updates:
@@ -516,7 +560,7 @@ def _handle_plugin(args, client):
         emit(res, args.output, lambda r: print(f"install requested: {r['plugin']} (restart may be required)"))
 
 
-def _handle_doctor(args, client):
+def _handle_doctor(args: argparse.Namespace, client: JenkinsClient) -> None:
     checks = client.doctor()
 
     def _text(_):
@@ -530,7 +574,7 @@ def _handle_doctor(args, client):
         sys.exit(1)
 
 
-def _handle_context(args):
+def _handle_context(args: argparse.Namespace) -> None:
     if args.context_cmd == "list":
         contexts = list_contexts()
 

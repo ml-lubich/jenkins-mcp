@@ -124,16 +124,22 @@ jenkins-mcp jobs --search dep
 jenkins-mcp serve
 ```
 
-Credentials can also be passed explicitly, overriding env vars / config file:
+For backward compatibility, connection flags can still be passed before the
+command. They are hidden from root help; prefer contexts or environment
+variables. Avoid `--password` because command arguments may be visible in shell
+history and process listings. To read it from standard input instead:
 
 ```bash
-jenkins-mcp --url https://jenkins.example.com --user admin --password '...' status
+printf '%s\n' "$JENKINS_PASSWORD" | jenkins-mcp --url https://jenkins.example.com --user admin --password-stdin status
 ```
 
-Every command supports `-o json` for machine-readable output:
+Root help lists the command hierarchy, and groups such as `node` or `job`
+show their subcommands when invoked without one. Use `-V` for the CLI version.
+Commands support `-o json` for machine-readable output; `-j` is the concise
+JSON option when placed before the command:
 
 ```bash
-jenkins-mcp -o json jobs
+jenkins-mcp -j jobs
 # {"schemaVersion": "1", "jobs": [...]}
 ```
 
@@ -204,8 +210,8 @@ jenkins-mcp doctor
 
 ```bash
 jenkins-mcp credential list
-jenkins-mcp credential create deploy-key --kind userpass --username deployer --secret 'a-strong-password'
-jenkins-mcp credential create ci-token --kind secret-text --secret 'a-token-value'
+printf '%s\n' "$DEPLOY_PASSWORD" | jenkins-mcp credential create deploy-key --kind userpass --username deployer --secret-stdin
+printf '%s\n' "$CI_TOKEN" | jenkins-mcp credential create ci-token --kind secret-text --secret-stdin
 jenkins-mcp credential delete deploy-key
 ```
 
@@ -235,7 +241,7 @@ JENKINS_CONTEXT=prod jenkins-mcp jobs
 `jenkins-mcp` never ships with credentials. It resolves connection settings in this
 order, first match wins:
 
-1. Explicit CLI flags: `--url`, `--user`, `--password`
+1. Explicit CLI flags: `--url`, `--user`, `--password` (legacy; use `--password-stdin` to avoid argv exposure)
 2. Environment variables: `JENKINS_URL`, `JENKINS_USER`, `JENKINS_PASSWORD`
 3. A JSON config file at `~/.config/jenkins-mcp/config.json`
 

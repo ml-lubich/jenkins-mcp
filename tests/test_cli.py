@@ -10,6 +10,65 @@ from jenkins_mcp.cli import main
 CREDS = ["--user", "testuser", "--password", "testpass"]
 
 class TestCLI(unittest.TestCase):
+    def test_root_help_hides_legacy_connection_options(self):
+        with patch.object(sys, "argv", ["jenkins-mcp", "-h"]):
+            with patch("sys.stdout", new=StringIO()) as fake_out:
+                with self.assertRaises(SystemExit) as cm:
+                    main()
+        self.assertEqual(cm.exception.code, 0)
+        output = fake_out.getvalue()
+        self.assertIn("-V", output)
+        self.assertIn("--json", output)
+        self.assertIn("status", output)
+        for legacy in ("--url", "--user", "--password", "--context"):
+            self.assertNotIn(legacy, output)
+
+    def test_root_and_empty_group_help_do_not_create_client(self):
+        for argv, expected in (
+            (["jenkins-mcp"], ("status",)),
+            (["jenkins-mcp", "node"], ("add", "remove")),
+        ):
+            with patch.object(sys, "argv", argv):
+                with patch("sys.stdout", new=StringIO()) as fake_out:
+                    with patch("jenkins_mcp.cli.JenkinsClient") as client:
+                        main()
+            for item in expected:
+                self.assertIn(item, fake_out.getvalue())
+            client.assert_not_called()
+
+    def test_version_flag_shortcut(self):
+        for option in ("-V", "--version"):
+            with patch.object(sys, "argv", ["jenkins-mcp", option]):
+                with patch("sys.stdout", new=StringIO()) as fake_out:
+                    with self.assertRaises(SystemExit) as cm:
+                        main()
+            self.assertEqual(cm.exception.code, 0)
+            self.assertIn("jenkins-mcp", fake_out.getvalue())
+
+    def test_password_stdin_is_passed_to_client_without_argv(self):
+        client = MagicMock()
+        client.get_status.return_value = {"nodes": []}
+        argv = [
+            "jenkins-mcp",
+            "--url", "https://jenkins.example.test",
+            "--user", "testuser",
+            "--password-stdin",
+            "status",
+        ]
+        with (
+            patch.object(sys, "argv", argv),
+            patch.object(sys, "stdin", StringIO("stdin-secret\n")),
+            patch("jenkins_mcp.cli.JenkinsClient.from_env", return_value=client) as factory,
+            patch("sys.stdout", new=StringIO()),
+        ):
+            main()
+        factory.assert_called_once_with(
+            url="https://jenkins.example.test",
+            username="testuser",
+            password="stdin-secret",
+            context=None,
+        )
+
     @patch("jenkins_mcp.client.JenkinsClient.get_status")
     def test_cli_status(self, mock_status):
         mock_status.return_value = {
