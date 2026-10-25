@@ -10,6 +10,16 @@ from jenkins_mcp.cli import main
 CREDS = ["--user", "testuser", "--password", "testpass"]
 
 class TestCLI(unittest.TestCase):
+    def test_agent_schema_lists_registered_mcp_tools(self):
+        with patch.object(sys, "argv", ["jenkins-mcp", "agent", "schema"]):
+            with patch("sys.stdout", new=StringIO()) as fake_out:
+                main()
+
+        payload = json.loads(fake_out.getvalue())
+        self.assertEqual(payload["tool"], "jenkins-mcp")
+        self.assertEqual(payload["mcp_server"], ["jenkins-mcp", "serve"])
+        self.assertGreater(len(payload["mcp_tools"]), 0)
+
     def test_root_help_hides_legacy_connection_options(self):
         with patch.object(sys, "argv", ["jenkins-mcp", "-h"]):
             with patch("sys.stdout", new=StringIO()) as fake_out:

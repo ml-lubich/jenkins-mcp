@@ -3,6 +3,7 @@ import argparse
 import json
 import time
 import fnmatch
+import asyncio
 from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
@@ -16,6 +17,31 @@ from jenkins_mcp.client import (
     use_context,
     current_context,
 )
+
+
+def _agent_schema() -> dict[str, Any]:
+    """Return the registered MCP tool schemas without reading Jenkins credentials."""
+    try:
+        cli_version = version("jenkins-cli-mcp")
+    except PackageNotFoundError:
+        cli_version = "unknown"
+
+    from jenkins_mcp.mcp_server import create_mcp_server
+
+    tools = asyncio.run(create_mcp_server(client=object()).list_tools())
+    return {
+        "tool": "jenkins-mcp",
+        "version": cli_version,
+        "mcp_server": ["jenkins-mcp", "serve"],
+        "mcp_tools": [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.inputSchema,
+            }
+            for tool in tools
+        ],
+    }
 
 
 def emit(
@@ -235,6 +261,11 @@ def main() -> None:
     # serve
     p_serve = subparsers.add_parser("serve", help="Run MCP stdio server")
 
+    # agent schema
+    p_agent = subparsers.add_parser("agent", help="Machine-readable agent metadata")
+    agent_sub = p_agent.add_subparsers(dest="agent_cmd")
+    agent_sub.add_parser("schema", help="Print the registered MCP tool schemas as JSON")
+
     # Accept -o/--output after the subcommand too (not just globally). SUPPRESS
     # default so an unspecified sub-level flag never clobbers the global value.
     def _add_output_everywhere(p):
@@ -260,11 +291,16 @@ def main() -> None:
         "job": "job_cmd", "build": "build_cmd", "pipeline": "pipeline_cmd",
         "queue": "queue_cmd", "credential": "credential_cmd",
         "plugin": "plugin_cmd", "context": "context_cmd",
+        "agent": "agent_cmd",
     }
     nested = group_commands.get(args.command)
     if nested and getattr(args, nested, None) is None:
         next(action.choices[args.command] for action in parser._actions
              if isinstance(action, argparse._SubParsersAction)).print_help()
+        return
+
+    if args.command == "agent" and args.agent_cmd == "schema":
+        print(json.dumps(_agent_schema(), indent=2))
         return
 
     if args.password_stdin:

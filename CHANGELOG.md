@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2
+
+- Add `jenkins-mcp agent schema`, generated from the MCP server's registered
+  tools and safe to run without Jenkins credentials.
+
 ## 0.3.1
 
 Pin `mcp<2` — mcp 2.x renamed `FastMCP` to `MCPServer` and removed

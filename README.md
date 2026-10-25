@@ -323,6 +323,9 @@ Exposed MCP Tools:
 - `jenkins_install_plugin(name)`
 - `jenkins_rerun_build(job, build)`
 
+Print the current machine-readable MCP tool contract with `jenkins-mcp agent schema`.
+The schema is generated from the server's registered tools and does not read Jenkins credentials.
+
 Every tool other than `jenkins_get_status`/`jenkins_add_node`/`jenkins_remove_node`/`jenkins_create_user`/`jenkins_list_jobs`/`jenkins_use_jgit`/`jenkins_build_job`
 catches its own errors and returns `{"error": "..."}` instead of raising.
 

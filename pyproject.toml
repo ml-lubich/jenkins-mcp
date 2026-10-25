@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jenkins-cli-mcp"
-version = "0.3.1"
+version = "0.3.2"
 description = "Jenkins CLI + MCP server — build lifecycle, pipelines, logs, artifacts, queue, credentials, plugins, multi-context, node/user admin, and a native MCP server for AI agents"
 readme = "README.md"
 requires-python = ">=3.10"
